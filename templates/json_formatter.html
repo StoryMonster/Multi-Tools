@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block head %}
+<title>json formatter</title>
+{% endblock %}
+
+{% block body %}
+<form method="POST">
+<table>
+  <tr>
+    <td><textarea name="input" rows=40 cols=70 style="resize:none; overflow:auto;" required>{{input}}</textarea></td>
+    <td><input type="submit"></input></td>
+    <td><textarea name="output" rows=40 cols=70 style="resize:none; overflow:auto;" readonly>{{output}}</textarea></td>
+  </tr>
+</table>
+</form>
+{% endblock %}
