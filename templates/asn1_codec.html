@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block head %}
+<title>asn1 codec</title>
+{% endblock %}
+
+{% block body %}
+<script type="text/javascript">
+    window.onload = function() { onAsn1CodecWindowLoad();};
+    window.onresize = function() { onAsn1CodecWindowResize();};
+    window.onbeforeunload = function(e) { onAsn1CodecWindowUnload(); }
+</script>
+<table>
+  <tr>
+    <td><input type="file" accept="*.asn" id="asn_file"></input></td>
+    <td><button type="button" onclick="onCompileClicked()">compile</button></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td><select id="msgs" size=41 style="width: 200px;" onChange="onSelectedMsgChanged(this.options.selectedIndex)"></select></td>
+    <td>
+      <table>
+        <tr><td><textarea id="input" style="resize:none;"></textarea></td></tr>
+        <tr>
+          <td>
+            <table>
+              <tr>
+                <td><button type="button" id="encode" onclick="onEncodeClicked()">encode</button></td>
+                <td><input type="radio" id="per" name="protocol" checked="checked">APER</input></td>
+                <td><input type="radio" id="uper" name="protocol">UPER</input></td>
+                <td><input type="radio" id="ber" name="protocol">BER</input></td>
+                <td><input type="radio" id="der" name="protocol">DER</input></td>
+                <td><input type="radio" id="oer" name="protocol">OER</input></td>
+                <td><button type="button" id="decode" onclick="onDecodeClicked()">decode</button></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td><textarea id="output" style="resize:none;" readonly="readonly"></textarea></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<script type="text/javascript" src="../static/asn1_codec.js"></script>
+{% endblock %}

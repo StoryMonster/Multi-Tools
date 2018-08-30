@@ -1,0 +1,9 @@
+[proc] module NR-RRC-PDU-Pre3GPP-Description (oid: []): 605 ASN.1 assignments found
+[proc] module NR-UE-Variables (oid: []): 6 ASN.1 assignments found
+[proc] module NR-InterNodeDefinitions (oid: []): 34 ASN.1 assignments found
+--- compilation cycle ---
+--- compilation cycle ---
+--- verifications ---
+[proc] ASN.1 modules processed: ['NR-RRC-PDU-Pre3GPP-Description', 'NR-UE-Variables', 'NR-InterNodeDefinitions']
+[proc] ASN.1 objects compiled: 507 types, 0 sets, 135 values
+[proc] done
