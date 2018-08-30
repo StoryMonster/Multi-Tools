@@ -7,10 +7,10 @@ import os
 
 app = Flask(__name__)
 users = Users(os.path.join(os.getcwd(), "users"))
-global asn1_codec_user
 
 @app.route('/')
 def index():
+    users.add_user(request.remote_addr)
     return render_template('tool_list.html')
 
 
@@ -37,21 +37,21 @@ def asn1_codec_page():
 
 @app.route('/asn1_codec', methods=['POST'])
 def asn1_codec():
-    global asn1_codec_user
+    user = users.get_user_by_ip(request.remote_addr)
+    if user is None: return '', 404
+    if user.asn1codec is None:
+        user.asn1codec = Asn1Codec(user.asn1codec_files['py_file'], user.asn1codec_files['log_file'])
     req = request.get_json()
     if req['type'] == 'compile':
-        asn1_codec_user = Asn1Codec(None, req['content'])
-        asn1_codec_user.compile()
-        status, log, msgs = asn1_codec_user.is_compile_success(), asn1_codec_user.get_compile_log(), asn1_codec_user.get_supported_msgs()
+        user.asn1codec.compile(req['content'])
+        status, log, msgs = user.asn1codec.is_compile_success(), user.asn1codec.get_compile_log(), user.asn1codec.get_supported_msgs()
         return json.dumps({'status': status, 'msgs': msgs, 'log': log})
     elif req['type'] == 'encode':
-        if asn1_codec_user is not None:
-            status, output = asn1_codec_user.encode(req['protocol'], req["msg_name"], req['content'])
-            return json.dumps({'status': status, 'output': output})
+        status, output = user.asn1codec.encode(req['protocol'], req["msg_name"], req['content'])
+        return json.dumps({'status': status, 'output': output})
     elif req['type'] == 'decode':
-        if asn1_codec_user is not None:
-            status, output = asn1_codec_user.decode(req['protocol'], req["msg_name"], req['content'])
-            return json.dumps({'status': status, 'output': output})
+        status, output = user.asn1codec.decode(req['protocol'], req["msg_name"], req['content'])
+        return json.dumps({'status': status, 'output': output})
     else:
         pass
 

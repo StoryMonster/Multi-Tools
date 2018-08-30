@@ -40,19 +40,17 @@ def _get_supported_messages_in_modules(file):
 
 
 class Asn1Codec(object):
-    def __init__(self, user, data):
-        self.user = user
-        self.data = data
+    def __init__(self, py_file, log_file):
         self.py_file = "./users/0/target.py"
         self.log_file = "./users/0/run.log"
         self.msgs_in_modules = {}
     
-    def compile(self):
+    def compile(self, data):
         ckw = {'autotags': True, 'extimpl': True, 'verifwarn': True}
         _stdout_, _stderr_ = sys.stdout, sys.stderr
         with open(self.log_file, "w") as fd:
             sys.stdout, sys.stderr = fd, fd
-            compile_text(self.data, **ckw)
+            compile_text(data, **ckw)
             generate_modules(PycrateGenerator, self.py_file)
             sys.stdout, sys.stderr = _stdout_, _stderr_
         self.msgs_in_modules = _get_supported_messages_in_modules(self.py_file)
