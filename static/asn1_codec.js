@@ -1,10 +1,40 @@
 
 var selectedMessage = null;
 
+
+function postMsgDefinitionReq(req, callBack)
+{
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function(){
+        if (this.readyState == 4 && this.status == 200) {
+            var fixedResponse = xmlhttp.responseText.replace(/\\'/g, "'");
+            var data = JSON.parse(fixedResponse);
+            var isDefinitionFounded = data["status"];
+            var definition = data["defintion"];
+            callBack(isDefinitionFounded, definition);
+        };
+    };
+    xmlhttp.open("POST", '/asn1_codec', true);
+    xmlhttp.setRequestHeader("Content-Type", "application/json");
+    xmlhttp.send(JSON.stringify(req));
+}
+
+
 function onSelectedMsgChanged(selectedIndex)
 {
     var msgsBox = document.getElementById("msgs");
     selectedMessage = msgsBox.options[selectedIndex].value;
+    var req = {"type": "get_msg_definition",
+               "msg_name": selectedMessage};
+    postMsgDefinitionReq(req, function(isDefinitionFounded, definition){
+        var codeDisplayBox = document.getElementById("code_display");
+        if (isDefinitionFounded == true){
+            codeDisplayBox.value = definition;
+        }
+        else{
+            codeDisplayBox.value = "Cannot find the definition of this message!"
+        }
+    });
 }
 
 function onAsn1CodecWindowLoad()
@@ -16,18 +46,16 @@ function onAsn1CodecWindowLoad()
     outputBoxStyle.height = window.innerHeight * 0.4 + "px";
     outputBoxStyle.width = window.innerWidth * 0.5 + "px";
     var msgListStyle = document.getElementById("msgs").style;
-    msgListStyle.width = window.innerWidth * 0.2 + "px"
-    msgListStyle.height = window.innerHeight * 0.87 + "px"
+    msgListStyle.width = window.innerWidth * 0.2 + "px";
+    msgListStyle.height = window.innerHeight * 0.87 + "px";
+    var codeDisplayBoxStyle = document.getElementById("code_display").style;
+    codeDisplayBoxStyle.width = window.innerWidth * 0.26 + "px";
+    codeDisplayBoxStyle.height = window.innerHeight * 0.87 + "px";
 }
 
 function onAsn1CodecWindowResize()
 {
     onAsn1CodecWindowLoad();
-}
-
-function onAsn1CodecWindowUnload()
-{
-    alert("Blabla");
 }
 
 function postFileContent(req, callBack)

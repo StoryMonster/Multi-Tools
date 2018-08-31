@@ -44,6 +44,7 @@ class Asn1Codec(object):
         self.py_file = py_file
         self.log_file = log_file
         self.msgs_in_modules = {}
+        self.asn_mgmt = None
     
     def compile(self, data):
         ckw = {'autotags': True, 'extimpl': True, 'verifwarn': True}
@@ -54,6 +55,7 @@ class Asn1Codec(object):
             generate_modules(PycrateGenerator, self.py_file)
             sys.stdout, sys.stderr = _stdout_, _stderr_
         self.msgs_in_modules = _get_supported_messages_in_modules(self.py_file)
+        self.asn_mgmt = AsnCodeMgmt(data)
     
     def encode(self, protocol, msg_name, msg_content):
         pdu_str = self._get_pdu_str(msg_name)
@@ -146,3 +148,114 @@ class Asn1Codec(object):
             if matched[i] == "users":
                 return module
         return None
+
+
+def _reformat_asn_line(line):
+    words = re.findall(r"\(.*\)|[\w\-]+|[\:\=]+|\{|\}|,", line)
+    new_lines = []
+    indent = 0
+    new_line = ' ' * indent
+    for word in words:
+        if word == "{":
+            indent += 4
+            new_line += word
+            new_lines.append(new_line)
+            new_line = ' ' * indent
+        elif word == ",":
+            new_line += word
+            new_lines.append(new_line)
+            new_line = ' ' * indent
+        elif word == "}":
+            new_lines.append(new_line)
+            indent -= 4
+            new_line = ' ' * indent
+            new_lines.append(new_line + word)
+        else:
+            new_line += (word + " ")
+    return "\n".join(new_lines)
+
+
+class AsnCodeMgmt(object):
+    def __init__(self, data):
+        self.lines = data.split('\n')
+        self.msgs_with_definition = {}
+        self._remove_comments_and_blank_lines()
+        self._replace_all_macros()
+        self._put_one_type_one_line()    ## self.lines will be useless from this step, use self.msgs_with_definition instead
+
+    def _remove_comments_and_blank_lines(self):
+        regs = [r"(.*)--.*--(.*)", r"(.*)?--.*", ".*"]
+        lines = []
+        for line in self.lines:
+            if line.strip() == "": continue
+            for i in range(len(regs)):
+                matched = re.match(regs[i], line)
+                if matched:
+                    if i == 0:
+                        lines.append(matched.group(1) + matched.group(2))
+                    elif i == 1:
+                        lines.append(matched.group(1))
+                    else:
+                        lines.append(line)
+                    break
+        self.lines = lines
+
+    def _replace_all_macros(self):
+        macro_reg = re.compile(r"([a-zA-Z0-9\-]+)\s+\w+\s+::=\s*([a-zA-Z0-9\-]+)")
+        macros = []
+        lines = self.lines
+        for i in range(len(lines)):
+            matched = macro_reg.match(lines[i])
+            if matched:
+                macros.append((matched.group(1), matched.group(2)))
+                lines[i] = ''
+        for i in range(len(lines)):
+            if lines[i] == '': continue
+            for macro in macros:
+                replace_pattern = r"([^\w\-\d]+)({})([^\w\-\d]+)".format(macro[0])
+                lines[i] = re.sub(replace_pattern, r"\1 %s \3" % macro[1], lines[i])
+        self.lines = []
+        for line in lines:
+            if line != '': self.lines.append(line)
+
+    def _put_one_type_one_line(self):
+        new_lines = []
+        unmatched_bracket_amount = 0
+        new_line = ''
+        for line in self.lines:
+            new_line += line.strip()
+            unmatched_bracket_amount += (line.count('{') - line.count('}'))
+            if unmatched_bracket_amount == 0:
+                new_lines.append(new_line)
+                new_line = ''
+        self.lines = []
+        for line in new_lines:
+            name = line.split("::=")[0].strip()
+            self.msgs_with_definition[name] = line
+
+    def get_message_definition(self, msg_name):
+        from queue import Queue
+        msgs = Queue()
+        msgs.put(msg_name)
+        res = ''
+        while not msgs.empty():
+            msg = msgs.get()
+            definition = self.msgs_with_definition[msg]
+            res = res + "\n" + _reformat_asn_line(definition)
+            types = self._get_member_types(msg)
+            for item in types:
+                msgs.put(item)
+        return res
+    
+    def _get_member_types(self, msg_name):
+        definition = self.msgs_with_definition[msg_name]
+        asn_key_words = ["SEQUENCE", "OF", "CHOICE", "BOOLEAN", "BIT", "STRING", "OCTET", "CONTAINING", "NULL", "SIZE",
+                         "SET", "INTEGER"]
+        types = []
+        for typ in re.findall(r"[\w\-]+", definition)[1:]:
+            if (typ not in asn_key_words) and (typ in self.msgs_with_definition):
+                types.append(typ)
+        return types
+
+
+

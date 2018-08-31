@@ -8,6 +8,7 @@ import os
 app = Flask(__name__)
 users = Users(os.path.join(os.getcwd(), "users"))
 
+
 @app.route('/')
 def index():
     users.add_user(request.remote_addr)
@@ -58,6 +59,9 @@ def asn1_codec():
     elif req['type'] == 'decode':
         status, output = user.asn1codec.decode(req['protocol'], req["msg_name"], req['content'])
         return json.dumps({'status': status, 'output': output})
+    elif req['type'] == 'get_msg_definition':
+        definition = user.asn1codec.asn_mgmt.get_message_definition(req["msg_name"])
+        return json.dumps({"status": True, "defintion": definition})
     else:
         pass
 

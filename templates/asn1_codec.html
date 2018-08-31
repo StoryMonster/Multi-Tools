@@ -8,7 +8,6 @@
 <script type="text/javascript">
     window.onload = function() { onAsn1CodecWindowLoad();};
     window.onresize = function() { onAsn1CodecWindowResize();};
-    window.onbeforeunload = function(e) { onAsn1CodecWindowUnload(); }
 </script>
 <table>
   <tr>
@@ -21,7 +20,7 @@
     <td><select id="msgs" size=41 style="width: 200px;" onChange="onSelectedMsgChanged(this.options.selectedIndex)"></select></td>
     <td>
       <table>
-        <tr><td><textarea id="input" style="resize:none;"></textarea></td></tr>
+        <tr><td><textarea id="input" style="resize:none;" wrap="off"></textarea></td></tr>
         <tr>
           <td>
             <table>
@@ -37,9 +36,10 @@
             </table>
           </td>
         </tr>
-        <tr><td><textarea id="output" style="resize:none;" readonly="readonly"></textarea></td></tr>
+        <tr><td><textarea id="output" style="resize:none; overflow: auto;" readonly="readonly"></textarea></td></tr>
       </table>
     </td>
+    <td><textarea id="code_display" style="resize:none; overflow: auto;" readonly="readonly" wrap="off"></textarea></td>
   </tr>
 </table>
 <script type="text/javascript" src="../static/asn1_codec.js"></script>
