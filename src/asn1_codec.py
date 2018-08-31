@@ -41,8 +41,8 @@ def _get_supported_messages_in_modules(file):
 
 class Asn1Codec(object):
     def __init__(self, py_file, log_file):
-        self.py_file = "./users/0/target.py"
-        self.log_file = "./users/0/run.log"
+        self.py_file = py_file
+        self.log_file = log_file
         self.msgs_in_modules = {}
     
     def compile(self, data):
@@ -60,7 +60,7 @@ class Asn1Codec(object):
         if pdu_str is None:
             return False, "Unknow message!"
         modules = [_change_variable_to_python_style(module) for module in self.msgs_in_modules]
-        target = __import__("users.0.target", globals(), locals(), modules)
+        target = __import__(self._get_target_module(), globals(), locals(), modules)
         pdu = eval("target." + pdu_str)
         msg = ast.literal_eval(msg_content)
         try:
@@ -88,7 +88,7 @@ class Asn1Codec(object):
         if pdu_str is None:
             return False, "Unknow message!"
         modules = [_change_variable_to_python_style(module) for module in self.msgs_in_modules]
-        target = __import__("users.0.target", globals(), locals(), modules)
+        target = __import__(self._get_target_module(), globals(), locals(), modules)
         pdu = eval("target." + pdu_str)
         try:
             if protocol == "per":
@@ -133,4 +133,16 @@ class Asn1Codec(object):
             for msg in self.msgs_in_modules[module]:
                 if msg == msg_name:
                     return _change_variable_to_python_style(module) + "." + _change_variable_to_python_style(msg)
+        return None
+    
+    def _get_target_module(self):
+        if "win32" in sys.platform:
+            matched = re.sub(r"\\", r".", self.py_file).split(".")[:-1]
+        if "linux" in sys.platform:
+            matched = re.sub(r"/", r".", self.py_file).split(".")[:-1]
+        module = matched[-1]
+        for i in range(len(matched)-2, 0, -1):
+            module = matched[i] + "." + module
+            if matched[i] == "users":
+                return module
         return None

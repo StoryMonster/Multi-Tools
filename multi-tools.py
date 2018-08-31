@@ -32,14 +32,20 @@ def json_formatter():
 
 @app.route('/asn1_codec')
 def asn1_codec_page():
+    user = users.get_user_by_ip(request.remote_addr)
+    if user is None: return 'You are not allowed to visit this page!'
+    if user.asn1codec is None:
+        user.create_asn1codec_data_dir()
+        user.asn1codec = Asn1Codec(user.asn1codec_files['py_file'], user.asn1codec_files['log_file'])
     return render_template('asn1_codec.html')
 
 
 @app.route('/asn1_codec', methods=['POST'])
 def asn1_codec():
     user = users.get_user_by_ip(request.remote_addr)
-    if user is None: return '', 404
+    if user is None: return 'You are not allowed to visit this page!'
     if user.asn1codec is None:
+        user.create_asn1codec_data_dir()
         user.asn1codec = Asn1Codec(user.asn1codec_files['py_file'], user.asn1codec_files['log_file'])
     req = request.get_json()
     if req['type'] == 'compile':

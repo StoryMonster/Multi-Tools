@@ -34,7 +34,8 @@ class Users(object):
             self.delete_user(user_id)
     
     def _create_user_data_dir(self, user_data_dir):
-        os.makedirs(user_data_dir)
+        if not os.path.exists(user_data_dir):
+            os.makedirs(user_data_dir)
     
     def _generate_user_id(self):
         self.user_id_counter += 1
@@ -52,8 +53,12 @@ class User(object):
     
     def create_asn1codec_data_dir(self):
         self.asn1codec_data_dir = os.path.join(self.data_dir, "asn1codec")
-        os.makedirs(self.asn1codec_data_dir)
+        if not os.path.exists(self.asn1codec_data_dir):
+            os.makedirs(self.asn1codec_data_dir)
         self.asn1codec_files['py_file'] = os.path.join(self.asn1codec_data_dir, "target.py")
         self.asn1codec_files['log_file'] = os.path.join(self.asn1codec_data_dir, "run.log")
+        with open(os.path.join(self.asn1codec_data_dir, "__init__.py"), "w"): pass
+        with open(self.asn1codec_files['py_file'], "w"): pass
+        with open(self.asn1codec_files['log_file'], "w"): pass
 
 
