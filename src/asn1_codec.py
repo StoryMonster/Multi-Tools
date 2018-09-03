@@ -2,6 +2,7 @@ import sys
 import re
 import ast
 import binascii
+import src.json_formatter as json_formatter
 from pycrate_asn1c.proc import compile_text, generate_modules, PycrateGenerator
 
 
@@ -57,16 +58,17 @@ class Asn1Codec(object):
         self.msgs_in_modules = _get_supported_messages_in_modules(self.py_file)
         self.asn_mgmt = AsnCodeMgmt(data)
     
-    def encode(self, protocol, msg_name, msg_content):
+    def encode(self, protocol, format, msg_name, msg_content):
         pdu_str = self._get_pdu_str(msg_name)
-        if pdu_str is None:
-            return False, "Unknow message!"
+        if pdu_str is None: return False, "Unknow message!"
         modules = [_change_variable_to_python_style(module) for module in self.msgs_in_modules]
         target = __import__(self._get_target_module(), globals(), locals(), modules)
         pdu = eval("target." + pdu_str)
-        msg = ast.literal_eval(msg_content)
         try:
-            pdu.set_val(msg)
+            if format == "asn1": pdu.from_asn1(msg_content)
+            else:
+                msg = ast.literal_eval(msg_content)
+                pdu.set_val(msg)
             payload = None
             if protocol == "per":
                 payload = pdu.to_aper()
@@ -82,13 +84,12 @@ class Asn1Codec(object):
                 return False, "Unkown protocol"
         except Exception as e:
             return False, str(e)
-        return True, str(binascii.hexlify(payload))
+        return True, binascii.hexlify(payload).decode("utf-8")
     
-    def decode(self, protocol, msg_name, payload):
+    def decode(self, protocol, format, msg_name, payload):
         ## the length of payload must be even, and payload should be hex stream
         pdu_str = self._get_pdu_str(msg_name)
-        if pdu_str is None:
-            return False, "Unknow message!"
+        if pdu_str is None: return False, "Unknow message!"
         modules = [_change_variable_to_python_style(module) for module in self.msgs_in_modules]
         target = __import__(self._get_target_module(), globals(), locals(), modules)
         pdu = eval("target." + pdu_str)
@@ -107,7 +108,8 @@ class Asn1Codec(object):
                 return False, "Unkown protocol"
         except Exception as e:
             return False, str(e)
-        return True, str(pdu())
+        res = pdu.to_asn1() if format == "asn1" else json_formatter.format_json(str(pdu()))
+        return True, res
     
     def get_supported_msgs(self):
         supported_msgs = []
@@ -126,6 +128,7 @@ class Asn1Codec(object):
         return ''.join(logs)
     
     def is_compile_success(self):
+        ##TODO: need to do more reliable check
         logs = self.get_compile_log()
         lines = logs.split('\n')
         return "[proc] done" == lines[-2].strip()   ## the last line is empty
@@ -151,27 +154,30 @@ class Asn1Codec(object):
 
 
 def _reformat_asn_line(line):
-    words = re.findall(r"\(.*\)|[\w\-]+|[\:\=]+|\{|\}|,", line)
+    words = re.findall(r"\([^\(\)]*\(.*?\)[^\(\)]*\)|\(.*?\)|[\w\-]+|[\:\=]+|\{|\}|,", line)
     new_lines = []
     indent = 0
     new_line = ' ' * indent
-    for word in words:
-        if word == "{":
+    for i in range(len(words)):
+        if words[i] == "{":
             indent += 4
-            new_line += word
+            new_line += words[i]
             new_lines.append(new_line)
             new_line = ' ' * indent
-        elif word == ",":
-            new_line += word
-            new_lines.append(new_line)
-            new_line = ' ' * indent
-        elif word == "}":
-            new_lines.append(new_line)
-            indent -= 4
-            new_line = ' ' * indent
-            new_lines.append(new_line + word)
+        elif words[i] == "}":
+            if words[i-1] == "{":
+                new_line += words[i]
+            else:
+                new_lines.append(new_line)
+                indent -= 4
+                new_line = (' ' * indent) + words[i] + " "
         else:
-            new_line += (word + " ")
+            if i > 0 and words[i-1] == ",":
+                new_lines.append(new_line)
+                new_line = (' ' * indent) + words[i] + " "
+            else:
+                new_line += (words[i] + " ")
+    if new_line.strip() != '': new_lines.append(new_line)
     return "\n".join(new_lines)
 
 
@@ -201,7 +207,7 @@ class AsnCodeMgmt(object):
         self.lines = lines
 
     def _replace_all_macros(self):
-        macro_reg = re.compile(r"([a-zA-Z0-9\-]+)\s+\w+\s+::=\s*([a-zA-Z0-9\-]+)")
+        macro_reg = re.compile(r"([\w\-]+)\s+\w+\s+::=\s*([\w\-]+)")
         macros = []
         lines = self.lines
         for i in range(len(lines)):
@@ -216,7 +222,7 @@ class AsnCodeMgmt(object):
                 lines[i] = re.sub(replace_pattern, r"\1 %s \3" % macro[1], lines[i])
         self.lines = []
         for line in lines:
-            if line != '': self.lines.append(line)
+            if line != '': self.lines.append(' '.join(line.split()))
 
     def _put_one_type_one_line(self):
         new_lines = []
@@ -250,7 +256,7 @@ class AsnCodeMgmt(object):
     def _get_member_types(self, msg_name):
         definition = self.msgs_with_definition[msg_name]
         asn_key_words = ["SEQUENCE", "OF", "CHOICE", "BOOLEAN", "BIT", "STRING", "OCTET", "CONTAINING", "NULL", "SIZE",
-                         "SET", "INTEGER"]
+                         "SET", "INTEGER", "DEFINITIONS", "AUTOMATIC", "TAGS", "BEGIN", "END", "IMPORTS", "FROM"]
         types = []
         for typ in re.findall(r"[\w\-]+", definition)[1:]:
             if (typ not in asn_key_words) and (typ in self.msgs_with_definition):

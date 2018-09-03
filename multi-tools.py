@@ -54,10 +54,10 @@ def asn1_codec():
         status, log, msgs = user.asn1codec.is_compile_success(), user.asn1codec.get_compile_log(), user.asn1codec.get_supported_msgs()
         return json.dumps({'status': status, 'msgs': msgs, 'log': log})
     elif req['type'] == 'encode':
-        status, output = user.asn1codec.encode(req['protocol'], req["msg_name"], req['content'])
+        status, output = user.asn1codec.encode(req['protocol'], req['format'], req["msg_name"], req['content'])
         return json.dumps({'status': status, 'output': output})
     elif req['type'] == 'decode':
-        status, output = user.asn1codec.decode(req['protocol'], req["msg_name"], req['content'])
+        status, output = user.asn1codec.decode(req['protocol'], req['format'], req["msg_name"], req['content'])
         return json.dumps({'status': status, 'output': output})
     elif req['type'] == 'get_msg_definition':
         definition = user.asn1codec.asn_mgmt.get_message_definition(req["msg_name"])

@@ -139,7 +139,13 @@ function getSelectedProtocol()
     if (document.getElementById("uper").checked) { return 'uper'; }
     if (document.getElementById("ber").checked) { return 'ber'; }
     if (document.getElementById("der").checked) { return 'der'; }
-    if (document.getElementById("oer").checked) { return 'oer'; }
+    if (document.getElementById("cer").checked) { return 'cer'; }
+}
+
+function getSelectedFormat()
+{
+    if (document.getElementById("asn1").checked) { return 'asn1'; }
+    if (document.getElementById("json").checked) { return 'json'; }   
 }
 
 function onEncodeClicked()
@@ -151,9 +157,11 @@ function onEncodeClicked()
     }
     var input = document.getElementById("input").value;
     var protocol = getSelectedProtocol();
+    var format = getSelectedFormat();
     var req = {"type": "encode",
                "msg_name": selectedMessage,
                "protocol": protocol,
+               "format": format,
                "content": input};
     postEncodeOrDecodeRequest(req, function(status, outputResult){
         var outputBox = document.getElementById("output");
@@ -171,9 +179,11 @@ function onDecodeClicked()
     }
     var input = document.getElementById("input").value;
     var protocol = getSelectedProtocol();
+    var format = getSelectedFormat();
     var req = {"type": "decode",
                "msg_name": selectedMessage,
                "protocol": protocol,
+               "format": format,
                "content": input};
     postEncodeOrDecodeRequest(req, function(status, outputResult){
         var outputBox = document.getElementById("output");
