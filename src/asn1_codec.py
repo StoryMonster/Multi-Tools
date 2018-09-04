@@ -3,7 +3,6 @@ import re
 import ast
 import binascii
 import src.json_formatter as json_formatter
-from pycrate_asn1c.proc import compile_text, generate_modules, PycrateGenerator
 
 
 def _change_variable_to_asn_style(variable):
@@ -40,23 +39,34 @@ def _get_supported_messages_in_modules(file):
     return supported_msgs_in_modules
 
 
+class AsnCodeError(RuntimeError):
+    def __init__(self, error_info):
+        super(RuntimeError, self).__init__(error_info)
+
+
 class Asn1Codec(object):
-    def __init__(self, py_file, log_file):
+    def __init__(self, py_file):
         self.py_file = py_file
-        self.log_file = log_file
         self.msgs_in_modules = {}
         self.asn_mgmt = None
     
     def compile(self, data):
-        ckw = {'autotags': True, 'extimpl': True, 'verifwarn': True}
-        _stdout_, _stderr_ = sys.stdout, sys.stderr
-        with open(self.log_file, "w") as fd:
-            sys.stdout, sys.stderr = fd, fd
+        try:
+            self.asn_mgmt = AsnCodeMgmt(data)
+            ckw = {'autotags': True, 'extimpl': True, 'verifwarn': True}
+            from pycrate_asn1c.proc import compile_text, generate_modules, PycrateGenerator
             compile_text(data, **ckw)
             generate_modules(PycrateGenerator, self.py_file)
-            sys.stdout, sys.stderr = _stdout_, _stderr_
+        except AsnCodeError as e:
+            return False, str(e), []
+        except Exception as e:
+            return False, str(e), []
         self.msgs_in_modules = _get_supported_messages_in_modules(self.py_file)
-        self.asn_mgmt = AsnCodeMgmt(data)
+        msgs = []
+        for module in self.msgs_in_modules:
+            msgs.extend(self.msgs_in_modules[module])
+        msgs.sort()
+        return True, "Compile Success!", msgs
     
     def encode(self, protocol, format, msg_name, msg_content):
         pdu_str = self._get_pdu_str(msg_name)
@@ -118,21 +128,6 @@ class Asn1Codec(object):
         supported_msgs.sort()
         return supported_msgs
     
-    def get_compile_log(self):
-        logs = []
-        with open(self.log_file, "r") as fd:
-            lines = fd.readlines()
-            for line in lines:
-                if len(line.strip()) == 0: continue
-                logs.append(line)
-        return ''.join(logs)
-    
-    def is_compile_success(self):
-        ##TODO: need to do more reliable check
-        logs = self.get_compile_log()
-        lines = logs.split('\n')
-        return "[proc] done" == lines[-2].strip()   ## the last line is empty
-    
     def _get_pdu_str(self, msg_name):
         for module in self.msgs_in_modules:
             for msg in self.msgs_in_modules[module]:
@@ -185,70 +180,68 @@ class AsnCodeMgmt(object):
     def __init__(self, data):
         self.lines = data.split('\n')
         self.msgs_with_definition = {}
-        self._remove_comments_and_blank_lines()
-        self._replace_all_macros()
-        self._put_one_type_one_line()    ## self.lines will be useless from this step, use self.msgs_with_definition instead
-
-    def _remove_comments_and_blank_lines(self):
-        regs = [r"(.*)--.*--(.*)", r"(.*)?--.*", ".*"]
-        lines = []
-        for line in self.lines:
-            if line.strip() == "": continue
-            for i in range(len(regs)):
-                matched = re.match(regs[i], line)
-                if matched:
-                    if i == 0:
-                        lines.append(matched.group(1) + matched.group(2))
-                    elif i == 1:
-                        lines.append(matched.group(1))
-                    else:
-                        lines.append(line)
-                    break
-        self.lines = lines
-
-    def _replace_all_macros(self):
-        macro_reg = re.compile(r"([\w\-]+)\s+\w+\s+::=\s*([\w\-]+)")
+        self._reformat_and_store_as_msgs_with_definition(data)
+    
+    def _reformat_and_store_as_msgs_with_definition(self, data):
+        lines = data.split('\n')
+        line_counter = 0
         macros = []
-        lines = self.lines
-        for i in range(len(lines)):
-            matched = macro_reg.match(lines[i])
+        macro_regular = re.compile(r"\s*([\w\-]+)\s+\w+\s+::=\s*([\w\-]+)\s*")
+        asn_type_regular = re.compile(r"\s*([\w\-]+)\s*::=.*")
+        bracket_counts = 0
+        code_block = ''     ## save entire message definition in one line
+        for line in lines:
+            line_counter += 1
+            if line.strip() == '': continue        ## ignore empty lines
+            line = self._remove_comments(line)     ## remove comments in line and remove extra blank
+            ## to check if it's a macro, if so save it in macros
+            matched = macro_regular.match(line)
             if matched:
                 macros.append((matched.group(1), matched.group(2)))
-                lines[i] = ''
-        for i in range(len(lines)):
-            if lines[i] == '': continue
+                continue
+            ## to collect every asn message
+            bracket_counts += (line.count('{') - line.count('}'))
+            if bracket_counts > 0:
+                code_block += line
+            elif bracket_counts == 0:
+                code_block += line
+                matched = asn_type_regular.match(code_block)
+                if matched:
+                    self.msgs_with_definition[matched.group(1)] = code_block
+                code_block = ''
+            else:
+                raise AsnCodeError("Error: line %d, unmatched }" % line_counter)
+        if bracket_counts != 0:
+            raise AsnCodeError("Error: unmatched {")
+        ## to replace macros in all messages
+        for msg in self.msgs_with_definition:
             for macro in macros:
-                replace_pattern = r"([^\w\-\d]+)({})([^\w\-\d]+)".format(macro[0])
-                lines[i] = re.sub(replace_pattern, r"\1 %s \3" % macro[1], lines[i])
-        self.lines = []
-        for line in lines:
-            if line != '': self.lines.append(' '.join(line.split()))
+                if macro[0] not in self.msgs_with_definition[msg]: continue
+                replace_pattern = r"([^\w\-]+)({})([^\w\-]+)".format(macro[0])
+                self.msgs_with_definition[msg] = re.sub(replace_pattern, r"\1 %s \3" % macro[1], self.msgs_with_definition[msg])
 
-    def _put_one_type_one_line(self):
-        new_lines = []
-        unmatched_bracket_amount = 0
-        new_line = ''
-        for line in self.lines:
-            new_line += line.strip()
-            unmatched_bracket_amount += (line.count('{') - line.count('}'))
-            if unmatched_bracket_amount == 0:
-                new_lines.append(new_line)
-                new_line = ''
-        self.lines = []
-        for line in new_lines:
-            name = line.split("::=")[0].strip()
-            self.msgs_with_definition[name] = line
+    def _remove_comments(self, line):
+        patterns_of_comments = [(r"(.*)--.*--(.*)", "type1"), (r"(.*)?--.*", "type2")]
+        for pattern in patterns_of_comments:
+            matched = re.match(pattern[0], line)
+            if matched:
+                line = (matched.group(1) + " " + matched.group(2)) if pattern[1] == "type1" else matched.group(1)
+                break
+        return ' '.join(line.split())
 
     def get_message_definition(self, msg_name):
         from queue import Queue
+        checked_msgs = []        # to avoid get one message definition multi times
         msgs = Queue()
         msgs.put(msg_name)
         res = ''
         while not msgs.empty():
             msg = msgs.get()
+            if msg in checked_msgs: continue
             definition = self.msgs_with_definition[msg]
             res = res + "\n" + _reformat_asn_line(definition)
             types = self._get_member_types(msg)
+            checked_msgs.append(msg)
             for item in types:
                 msgs.put(item)
         return res
@@ -262,6 +255,3 @@ class AsnCodeMgmt(object):
             if (typ not in asn_key_words) and (typ in self.msgs_with_definition):
                 types.append(typ)
         return types
-
-
-

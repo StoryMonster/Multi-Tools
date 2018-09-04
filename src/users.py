@@ -13,6 +13,7 @@ class Users(object):
         user.data_dir = os.path.join(self.users_data_dir, str(user_id))
         self._create_user_data_dir(user.data_dir)
         self.accounts[user_id] = user
+        return self.accounts[user_id]
     
     def delete_user(self, user_id):
         user = self.get_user_by_id(user_id)
@@ -59,6 +60,5 @@ class User(object):
         self.asn1codec_files['log_file'] = os.path.join(self.asn1codec_data_dir, "run.log")
         with open(os.path.join(self.asn1codec_data_dir, "__init__.py"), "w"): pass
         with open(self.asn1codec_files['py_file'], "w"): pass
-        with open(self.asn1codec_files['log_file'], "w"): pass
 
 

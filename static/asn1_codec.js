@@ -2,39 +2,22 @@
 var selectedMessage = null;
 
 
-function postMsgDefinitionReq(req, callBack)
+function postRequest(req, callBack)
 {
     var xmlhttp = new XMLHttpRequest();
     xmlhttp.onreadystatechange = function(){
         if (this.readyState == 4 && this.status == 200) {
             var fixedResponse = xmlhttp.responseText.replace(/\\'/g, "'");
             var data = JSON.parse(fixedResponse);
-            var isDefinitionFounded = data["status"];
-            var definition = data["defintion"];
-            callBack(isDefinitionFounded, definition);
+            var status = data["status"];
+            var output = data["output"];
+            var log = data["log"];
+            callBack(status, output, log);
         };
     };
     xmlhttp.open("POST", '/asn1_codec', true);
     xmlhttp.setRequestHeader("Content-Type", "application/json");
-    xmlhttp.send(JSON.stringify(req));
-}
-
-
-function onSelectedMsgChanged(selectedIndex)
-{
-    var msgsBox = document.getElementById("msgs");
-    selectedMessage = msgsBox.options[selectedIndex].value;
-    var req = {"type": "get_msg_definition",
-               "msg_name": selectedMessage};
-    postMsgDefinitionReq(req, function(isDefinitionFounded, definition){
-        var codeDisplayBox = document.getElementById("code_display");
-        if (isDefinitionFounded == true){
-            codeDisplayBox.value = definition;
-        }
-        else{
-            codeDisplayBox.value = "Cannot find the definition of this message!"
-        }
-    });
+    xmlhttp.send(JSON.stringify(req));    
 }
 
 function onAsn1CodecWindowLoad()
@@ -58,26 +41,6 @@ function onAsn1CodecWindowResize()
     onAsn1CodecWindowLoad();
 }
 
-function postFileContent(req, callBack)
-{
-    var xmlhttp = new XMLHttpRequest();
-    xmlhttp.onreadystatechange = function(){
-        if (this.readyState == 4 && this.status == 200) {
-            var fixedResponse = xmlhttp.responseText.replace(/\\'/g, "'");
-            var data = JSON.parse(fixedResponse);
-            var isCompileSuccess = data["status"];
-            var msgList = data["msgs"];
-            var compileLog = data["log"];
-            selectedMessage = null;
-            callBack(isCompileSuccess, compileLog, msgList);
-        };
-    };
-    xmlhttp.open("POST", '/asn1_codec', true);
-    xmlhttp.setRequestHeader("Content-Type", "application/json");
-    xmlhttp.send(JSON.stringify(req));
-}
-
-
 function showCompileLog(compileLog)
 {
     var outputBox = document.getElementById("output");
@@ -100,37 +63,18 @@ function showMessageList(msgList)
 
 function onCompileClicked()
 {
+    selectedMessage = null;
     var node = document.getElementById("asn_file");
     var fileName = node.files[0];
     var reader = new FileReader();
     reader.onload = function(){
         var req = {'type': 'compile', 'content': reader.result};
-        postFileContent(req, function(isCompileSuccess, compileLog, msgList){
+        postRequest(req, function(isCompileSuccess, msgList, compileLog){
             showCompileLog(compileLog);
-            if (isCompileSuccess == true)
-            {
-                showMessageList(msgList);
-            }
+            showMessageList(msgList);
         });
     };
     reader.readAsText(fileName);
-}
-
-function postEncodeOrDecodeRequest(req, callBack)
-{
-    var xmlhttp = new XMLHttpRequest();
-    xmlhttp.onreadystatechange = function(){
-        if (this.readyState == 4 && this.status == 200) {
-            var fixedResponse = xmlhttp.responseText.replace(/\\'/g, "'");
-            var data = JSON.parse(fixedResponse);
-            var isSuccess = data["status"];
-            var output = data["output"];
-            callBack(isSuccess, output);
-        };
-    };
-    xmlhttp.open("POST", '/asn1_codec', true);
-    xmlhttp.setRequestHeader("Content-Type", "application/json");
-    xmlhttp.send(JSON.stringify(req));
 }
 
 function getSelectedProtocol()
@@ -163,10 +107,13 @@ function onEncodeClicked()
                "protocol": protocol,
                "format": format,
                "content": input};
-    postEncodeOrDecodeRequest(req, function(status, outputResult){
+    postRequest(req, function(status, outputResult, log){
         var outputBox = document.getElementById("output");
         outputBox.value = outputResult + "\n";
-        if (status == false) { outputBox.value += "Encode fail!"; }
+        if (status == false) {
+            outputBox.value += "Encode fail!\n";
+            outputBox.value += log;
+        }
     });
 }
 
@@ -185,9 +132,30 @@ function onDecodeClicked()
                "protocol": protocol,
                "format": format,
                "content": input};
-    postEncodeOrDecodeRequest(req, function(status, outputResult){
+    postRequest(req, function(status, outputResult, log){
         var outputBox = document.getElementById("output");
         outputBox.value = outputResult + "\n";
-        if (status == false) { outputBox.value += "Decode fail!"; }
+        if (status == false) {
+            outputBox.value += "Decode fail!\n";
+            outputBox.value += log;
+        }
+    });
+}
+
+function onSelectedMsgChanged(selectedIndex)
+{
+    var msgsBox = document.getElementById("msgs");
+    selectedMessage = msgsBox.options[selectedIndex].value;
+    var req = {"type": "get_msg_definition",
+               "msg_name": selectedMessage};
+    postRequest(req, function(isDefinitionFounded, definition, log){
+        var codeDisplayBox = document.getElementById("code_display");
+        if (isDefinitionFounded == true){
+            codeDisplayBox.value = definition;
+        }
+        else{
+            codeDisplayBox.value = "Cannot find the definition of this message!\n";
+            codeDisplayBox.value += log;
+        }
     });
 }
