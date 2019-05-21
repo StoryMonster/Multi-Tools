@@ -51,6 +51,7 @@ class User(object):
         self.asn1codec = None
         self.asn1codec_data_dir = None
         self.asn1codec_files = {}
+        self.file_selector = None
     
     def create_asn1codec_data_dir(self):
         self.asn1codec_data_dir = os.path.join(self.data_dir, "asn1codec")

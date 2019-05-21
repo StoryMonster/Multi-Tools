@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block head %}
+<title>json formatter</title>
+<script type="text/javascript" src="../static/file_selector.js"></script>
+{% endblock %}
+
+{% block body %}
+<hgroup>
+    <lable id="filenamelable">Copy filenames here</lable>
+    <br>
+    <textarea id="filecontent" style="overflow:auto;height:70%;width:30%"></textarea>
+    <br>
+    <button onclick="onClickSelect()">SELECT</button> <button onclick="onClickAbandon()">ABANDON</button>
+</hgroup>
+{% endblock %}
